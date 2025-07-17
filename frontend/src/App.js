@@ -178,7 +178,7 @@ function App() {
       setFieldsLoading(true);
       setError(null);
       try {
-        const res = await fetch('http://localhost:5000/api/list-pdf-fields');
+        const res = await fetch('https://subsidy-doc-auto.onrender.com/api/list-pdf-fields');
         if (!res.ok) throw new Error('Failed to fetch PDF fields');
         const data = await res.json();
         setFieldNames(data.fields);
@@ -256,7 +256,7 @@ function App() {
     try {
       const data = new URLSearchParams();
       Object.entries(form).forEach(([key, value]) => data.append(key, value));
-      const res = await fetch('http://localhost:5000/api/fill-pdf', {
+      const res = await fetch('https://subsidy-doc-auto.onrender.com/api/fill-pdf', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
