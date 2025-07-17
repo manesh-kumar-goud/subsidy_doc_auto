@@ -32,7 +32,7 @@ export default function AutoFillPage() {
     formData.append('pvModule', images.pvModule);
     formData.append('inverter', images.inverter);
     try {
-      const res = await fetch('/api/gemini-autofill', {
+      const res = await fetch('https://subsidy-doc-auto.onrender.com/api/gemini-autofill', {
         method: 'POST',
         body: formData,
       });
