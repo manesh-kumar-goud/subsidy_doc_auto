@@ -2,17 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import AutoFillPage from './AutoFillPage';
 
-// Utility to prettify PDF field names
-function prettifyFieldName(name) {
-  return name
-    .replace(/_/g, ' ')
-    .replace(/\b([a-z])/g, c => c.toUpperCase())
-    .replace(/\s+/g, ' ')
-    .replace(/\s+$/, '')
-    .replace(/\s+\(/g, ' (')
-    .replace(/\s+\//g, ' /');
-}
-
 // Optionally, group fields by keywords (simple heuristic)
 function groupFields(fields) {
   const groups = {
@@ -179,7 +168,21 @@ function App() {
       setError(null);
       try {
         const res = await fetch('https://subsidy-doc-auto.onrender.com/api/list-pdf-fields');
-        if (!res.ok) throw new Error('Failed to fetch PDF fields');
+        if (!res.ok) {
+          // Try to parse error details if available
+          let errorMsg = 'Failed to fetch PDF fields';
+          try {
+            const errorData = await res.json();
+            if (errorData.error && errorData.error.message) {
+              errorMsg = errorData.error.message;
+              // Check for quota/limit error
+              if (errorMsg.toLowerCase().includes('quota') || errorMsg.toLowerCase().includes('limit')) {
+                errorMsg += ' Please wait a minute and try again, or come back tomorrow if you have reached the daily limit.';
+              }
+            }
+          } catch (e) { /* ignore JSON parse errors */ }
+          throw new Error(errorMsg);
+        }
         const data = await res.json();
         setFieldNames(data.fields);
         // Set default values for fields if present, else empty
@@ -192,7 +195,7 @@ function App() {
         setForm(initialForm);
         setCustomFields(initialCustom);
       } catch (err) {
-        setError('Could not load PDF fields. Please check your backend.');
+        setError('Error: ' + err.message);
       } finally {
         setFieldsLoading(false);
       }
@@ -273,9 +276,6 @@ function App() {
       setLoading(false);
     }
   };
-
-  // Group fields for better UX
-  const groupedFields = groupFields(fieldNames);
 
   return (
     <Router>
