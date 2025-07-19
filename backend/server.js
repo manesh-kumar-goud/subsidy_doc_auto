@@ -110,7 +110,7 @@ async function callGeminiWithRetries(imageBase64, prompt, mimeType, maxRetries =
         },
       ];
       const response = await ai.models.generateContent({
-        model: "models/gemini-1.5-pro",
+        model: "models/gemini-1.5-flash",
         contents: userContent,
       });
       console.log("[Gemini DEBUG] Raw response:", JSON.stringify(response, null, 2));
