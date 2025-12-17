@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import AutoFillPage from './AutoFillPage';
+import { API_ENDPOINTS } from './config';
 
 // Optionally, group fields by keywords (simple heuristic)
 function groupFields(fields) {
@@ -167,22 +168,36 @@ function App() {
       setFieldsLoading(true);
       setError(null);
       try {
-        const res = await fetch('/api/list-pdf-fields');
+        const res = await fetch(API_ENDPOINTS.LIST_FIELDS);
         if (!res.ok) {
-          // Try to parse error details if available
+          // Check if response is JSON
+          const contentType = res.headers.get('content-type');
           let errorMsg = 'Failed to fetch PDF fields';
-          try {
-            const errorData = await res.json();
-            if (errorData.error && errorData.error.message) {
-              errorMsg = errorData.error.message;
-              // Check for quota/limit error
-              if (errorMsg.toLowerCase().includes('quota') || errorMsg.toLowerCase().includes('limit')) {
-                errorMsg += ' Please wait a minute and try again, or come back tomorrow if you have reached the daily limit.';
+          
+          if (contentType && contentType.includes('application/json')) {
+            try {
+              const errorData = await res.json();
+              if (errorData.error && errorData.error.message) {
+                errorMsg = errorData.error.message;
+                // Check for quota/limit error
+                if (errorMsg.toLowerCase().includes('quota') || errorMsg.toLowerCase().includes('limit')) {
+                  errorMsg += ' Please wait a minute and try again, or come back tomorrow if you have reached the daily limit.';
+                }
               }
-            }
-          } catch (e) { /* ignore JSON parse errors */ }
+            } catch (e) { /* ignore JSON parse errors */ }
+          } else {
+            // Response is HTML (likely 404 or server error)
+            errorMsg = `Server error (${res.status}). Make sure the backend server is running on http://localhost:5000`;
+          }
           throw new Error(errorMsg);
         }
+        
+        // Check content type before parsing JSON
+        const contentType = res.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          throw new Error('Server returned non-JSON response. Make sure backend is running on port 5000.');
+        }
+        
         const data = await res.json();
         setFieldNames(data.fields);
         // Set default values for fields if present, else empty
@@ -259,14 +274,22 @@ function App() {
     try {
       const data = new URLSearchParams();
       Object.entries(form).forEach(([key, value]) => data.append(key, value));
-      const res = await fetch('/api/fill-pdf', {
+      const res = await fetch(API_ENDPOINTS.FILL_PDF, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: data.toString(),
       });
-      if (!res.ok) throw new Error('Failed to generate PDF');
+      if (!res.ok) {
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await res.json();
+          throw new Error(errorData.error || 'Failed to generate PDF');
+        } else {
+          throw new Error(`Server error (${res.status}). Make sure backend is running on port 5000.`);
+        }
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       setPdfUrl(url);

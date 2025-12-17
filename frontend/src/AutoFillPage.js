@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { API_ENDPOINTS } from './config';
 
 const initialState = {
   discom: null,      // National Portal Screenshot
@@ -43,11 +44,34 @@ export default function AutoFillPage() {
     if (images.inverter) formData.append('inverter', images.inverter);
     
     try {
-      const res = await fetch('/api/gemini-autofill', {
+      const res = await fetch(API_ENDPOINTS.GEMINI_AUTOFILL, {
         method: 'POST',
         body: formData,
       });
-      if (!res.ok) throw new Error('Failed to process images');
+      
+      if (!res.ok) {
+        const contentType = res.headers.get('content-type');
+        let errorMsg = 'Failed to process images';
+        
+        if (contentType && contentType.includes('application/json')) {
+          try {
+            const errorData = await res.json();
+            errorMsg = errorData.error || errorMsg;
+          } catch (e) {
+            errorMsg = `Server error (${res.status}). Make sure backend is running on port 5000.`;
+          }
+        } else {
+          errorMsg = `Server error (${res.status}). Make sure backend is running on http://localhost:5000`;
+        }
+        throw new Error(errorMsg);
+      }
+      
+      // Check content type before parsing JSON
+      const contentType = res.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Server returned non-JSON response. Make sure backend is running on port 5000.');
+      }
+      
       const data = await res.json();
       setResult(data);
       // Save to localStorage and redirect to main page
@@ -67,14 +91,22 @@ export default function AutoFillPage() {
     try {
       const data = new URLSearchParams();
       Object.entries(result).forEach(([key, value]) => data.append(key, value));
-      const res = await fetch('/api/fill-pdf', {
+      const res = await fetch(API_ENDPOINTS.FILL_PDF, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: data.toString(),
       });
-      if (!res.ok) throw new Error('Failed to generate PDF');
+      if (!res.ok) {
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await res.json();
+          throw new Error(errorData.error || 'Failed to generate PDF');
+        } else {
+          throw new Error(`Server error (${res.status}). Make sure backend is running on port 5000.`);
+        }
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       setPdfUrl(url);
